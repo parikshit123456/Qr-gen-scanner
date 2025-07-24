@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>QR Code Generator & Scanner</title>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f0f2f5;
+    }
+
+    h2 {
+      text-align: center;
+      font-size: 1.5rem;
+      margin-bottom: 15px;
+    }
+
+    .section {
+      background: #fff;
+      padding: 20px;
+      margin: 20px auto;
+      border-radius: 12px;
+      max-width: 500px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    input[type="text"],
+    input[type="file"],
+    button {
+      display: block;
+      width: 100%;
+      padding: 12px;
+      font-size: 1rem;
+      margin-top: 10px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+    }
+
+    button {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      transition: background 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    .btn-share { background-color: #28a745; }
+    .btn-share:hover { background-color: #218838; }
+
+    .btn-download { background-color: #ff9800; }
+    .btn-download:hover { background-color: #e68900; }
+
+    canvas {
+      margin: 15px auto;
+      display: block;
+    }
+
+    #qr-reader {
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    #scan-result {
+      margin-top: 10px;
+      font-weight: bold;
+      color: #2c3e50;
+      text-align: center;
+    }
+
+    @media screen and (max-width: 600px) {
+      .section {
+        margin: 15px 10px;
+        padding: 15px;
+      }
+
+      h2 {
+        font-size: 1.25rem;
+      }
+
+      input,
+      button {
+        font-size: 0.95rem;
+        padding: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- QR Scanner -->
+  <div class="section">
+    <h2>📷 Scan QR Code (Camera)</h2>
+    <div id="qr-reader"></div>
+    <div id="scan-result"></div>
+  </div>
+
+  <!-- QR Generator -->
+  <div class="section">
+    <h2>🎯 Generate QR Code</h2>
+    <input type="text" id="qrText" placeholder="Enter text or URL"/>
+    <button onclick="generateQR()">Generate QR</button>
+    <div id="qrcode"></div>
+    <button class="btn-share" onclick="shareQR()">📤 Share QR Code</button>
+    <button class="btn-download" onclick="downloadQR()">📥 Download QR</button>
+  </div>
+
+  <!-- QR from File -->
+  <div class="section">
+    <h2>📁 Generate QR from File</h2>
+    <input type="file" id="fileInput" />
+    <div id="fileQR"></div>
+    <button class="btn-download" onclick="downloadFileQR()">📥 Download File QR</button>
+  </div>
+
+  <script>
+    // ✅ Generate QR from text
+    function generateQR() {
+      const text = document.getElementById("qrText").value.trim();
+      const canvasContainer = document.getElementById("qrcode");
+      canvasContainer.innerHTML = "";
+
+      if (!text) {
+        alert("Please enter some text or a link!");
+        return;
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.id = "qrCanvas"; // for downloading
+      QRCode.toCanvas(canvas, text, { width: 200 }, function (error) {
+        if (error) {
+          console.error("QR error:", error);
+          alert("Failed to generate QR.");
+        } else {
+          canvasContainer.appendChild(canvas);
+        }
+      });
+    }
+
+    // ✅ Download text QR
+    function downloadQR() {
+      const canvas = document.getElementById("qrCanvas");
+      if (!canvas) {
+        alert("Please generate a QR first.");
+        return;
+      }
+      const link = document.createElement("a");
+      link.download = "qr_code.png";
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    }
+
+    // ✅ Share QR (mobile supported)
+    function shareQR() {
+      const canvas = document.getElementById("qrCanvas");
+      if (!canvas) {
+        alert("Please generate a QR first.");
+        return;
+      }
+
+      canvas.toBlob(blob => {
+        const file = new File([blob], "qrcode.png", { type: "image/png" });
+
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          navigator.share({
+            title: "QR Code",
+            text: "Scan this QR code",
+            files: [file]
+          });
+        } else {
+          alert("Sharing not supported on this device.");
+        }
+      });
+    }
+
+    // ✅ QR Code Scanner from Camera
+    const html5QrCode = new Html5Qrcode("qr-reader");
+    Html5Qrcode.getCameras().then(devices => {
+      if (devices && devices.length) {
+        html5QrCode.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: 200 },
+          qrCodeMessage => {
+            document.getElementById("scan-result").innerText = `✅ Result: ${qrCodeMessage}`;
+            if (qrCodeMessage.startsWith("http://") || qrCodeMessage.startsWith("https://")) {
+              setTimeout(() => {
+                window.location.href = qrCodeMessage;
+              }, 1000);
+            }
+          },
+          error => {
+            // silent
+          }
+        );
+      }
+    }).catch(err => {
+      console.error("Camera access error:", err);
+    });
+
+    // ✅ QR from File Upload
+    document.getElementById("fileInput").addEventListener("change", function () {
+      const file = this.files[0];
+      const container = document.getElementById("fileQR");
+      container.innerHTML = "";
+
+      if (file) {
+        const fileURL = URL.createObjectURL(file);
+        const canvas = document.createElement("canvas");
+        canvas.id = "fileQRCanvas"; // needed for download
+
+        QRCode.toCanvas(canvas, fileURL, { width: 200 }, function (error) {
+          if (error) {
+            console.error("File QR error:", error);
+            alert("Could not generate QR from file.");
+          } else {
+            container.appendChild(document.createTextNode("File QR (scan to download):"));
+            container.appendChild(canvas);
+          }
+        });
+      }
+    });
+
+    // ✅ Download QR from File
+    function downloadFileQR() {
+      const canvas = document.getElementById("fileQRCanvas");
+      if (!canvas) {
+        alert("Please upload a file first and generate QR.");
+        return;
+      }
+
+      const link = document.createElement("a");
+      link.download = "file_qrcode.png";
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    }
+  </script>
+</body>
+</html>
