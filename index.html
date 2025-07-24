@@ -182,28 +182,45 @@
     }
 
     // ✅ QR Code Scanner from Camera
-    const html5QrCode = new Html5Qrcode("qr-reader");
-    Html5Qrcode.getCameras().then(devices => {
-      if (devices && devices.length) {
-        html5QrCode.start(
-          { facingMode: "environment" },
-          { fps: 10, qrbox: 200 },
-          qrCodeMessage => {
-            document.getElementById("scan-result").innerText = `✅ Result: ${qrCodeMessage}`;
-            if (qrCodeMessage.startsWith("http://") || qrCodeMessage.startsWith("https://")) {
-              setTimeout(() => {
-                window.location.href = qrCodeMessage;
-              }, 1000);
+const html5QrCode = new Html5Qrcode("qr-reader");
+
+// 🔍 UPI ID pattern checker (e.g. abc@okaxis)
+const isUPIID = (text) => /^[\w.-]+@[\w.-]+$/.test(text);
+
+Html5Qrcode.getCameras().then(devices => {
+  if (devices && devices.length) {
+    html5QrCode.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: 200 },
+      qrCodeMessage => {
+        document.getElementById("scan-result").innerText = `✅ Result: ${qrCodeMessage}`;
+
+        // 🌐 Handle various redirect types
+        if (
+          qrCodeMessage.startsWith("http://") ||
+          qrCodeMessage.startsWith("https://") ||
+          qrCodeMessage.startsWith("upi://pay") ||
+          isUPIID(qrCodeMessage)
+        ) {
+          setTimeout(() => {
+            // If plain UPI ID, convert to intent link
+            if (isUPIID(qrCodeMessage)) {
+              const upiLink = `upi://pay?pa=${qrCodeMessage}`;
+              window.location.href = upiLink;
+            } else {
+              window.location.href = qrCodeMessage;
             }
-          },
-          error => {
-            // silent
-          }
-        );
+          }, 1000);
+        }
+      },
+      error => {
+        // silent
       }
-    }).catch(err => {
-      console.error("Camera access error:", err);
-    });
+    );
+  }
+}).catch(err => {
+  console.error("Camera access error:", err);
+});
 
     // ✅ QR from File Upload using Transfer.sh
 document.getElementById("fileInput").addEventListener("change", async function () {
